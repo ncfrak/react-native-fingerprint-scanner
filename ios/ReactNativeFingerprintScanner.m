@@ -15,7 +15,6 @@ RCT_EXPORT_METHOD(isSensorAvailable: (RCTResponseSenderBlock)callback)
     LAContext *context = [[LAContext alloc] init];
     NSError *error;
 
-
     if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
         callback(@[[NSNull null], [self getBiometryType:context]]);
     } else {
@@ -66,42 +65,26 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
         context.localizedFallbackTitle = @"";
     }
 
-    void (^fallbackBlock)() = ^(){
-        NSError *error;
-        LAContext *context = [[LAContext alloc] init];
-        if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&error]) {
-            [context evaluatePolicy:LAPolicyDeviceOwnerAuthentication localizedReason:reason reply:^(BOOL success, NSError * _Nullable error) {
-                if(error || !success) {
-                    NSString *errorReason = @"AuthenticationFailed";
-                    NSLog(@"Authentication failed: %@", errorReason);
-                    callback(@[RCTMakeError(errorReason, nil, nil)]);
-                } else {
-                    callback(@[[NSNull null], @"Authenticated with Fingerprint Scanner."]);
-                }
-            }];
-        } else {
-            NSString *errorReason = @"AuthenticationFailed";
-            NSLog(@"Authentication failed: %@", errorReason);
-            callback(@[RCTMakeError(errorReason, nil, nil)]);
+    __auto_type policy = LAPolicyDeviceOwnerAuthenticationWithBiometrics;
+
+    if (@available(iOS 9, *)) {
+        if (fallbackEnabled) {
+            policy = LAPolicyDeviceOwnerAuthentication;
         }
-    };
+    }
+
 
     // Device has FingerprintScanner
-    if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
+    if ([context canEvaluatePolicy:policy error:&error]) {
         // Attempt Authentication
-        [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+        [context evaluatePolicy:policy
                 localizedReason:reason
                           reply:^(BOOL success, NSError *error)
          {
              // Failed Authentication
              if (error) {
-
-                 if(error.code == LAErrorUserFallback) {
-                     fallbackBlock();
-                     return;
-                 }
-
                  NSString *errorReason;
+
                  switch (error.code) {
                      case LAErrorAuthenticationFailed:
                          errorReason = @"AuthenticationFailed";
@@ -109,6 +92,10 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
 
                      case LAErrorUserCancel:
                          errorReason = @"UserCancel";
+                         break;
+
+                     case LAErrorUserFallback:
+                         errorReason = @"UserFallback";
                          break;
 
                      case LAErrorSystemCancel:
@@ -136,7 +123,6 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
                          break;
                  }
 
-
                  NSLog(@"Authentication failed: %@", errorReason);
                  callback(@[RCTJSErrorFromCodeMessageAndNSError(errorReason, errorReason, nil)]);
                  return;
@@ -152,10 +138,35 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
          }];
 
     } else {
-        // This clause is reached if the user has attempted an invalid fingerprint too many times,
-        // or if Touch ID is not enabled
-        fallbackBlock();
+        if (error) {
+            NSString *errorReason;
 
+            switch (error.code) {
+                case LAErrorBiometryNotAvailable:
+                    errorReason = @"FingerprintScannerNotAvailable";
+                    break;
+
+                case LAErrorBiometryNotEnrolled:
+                    errorReason = @"FingerprintScannerNotEnrolled";
+                    break;
+
+                case LAErrorBiometryLockout:
+                    errorReason = @"DeviceLockedPermanent";
+                    break;
+
+                case LAErrorPasscodeNotSet:
+                    errorReason = @"PasscodeNotSet";
+                    break;
+
+                default:
+                    errorReason = @"FingerprintScannerNotSupported";
+                    break;
+            }
+
+            NSLog(@"Authentication failed: %@", errorReason);
+            callback(@[RCTJSErrorFromCodeMessageAndNSError(errorReason, errorReason, nil)]);
+            return;
+        }
         // Device does not support FingerprintScanner
         callback(@[RCTJSErrorFromCodeMessageAndNSError(@"FingerprintScannerNotSupported", @"FingerprintScannerNotSupported", nil)]);
         return;
