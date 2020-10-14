@@ -144,7 +144,7 @@ public class ReactNativeFingerprintScannerModule
                         .setConfirmationRequired(false)
                         .setDescription(description)
                         .setSubtitle(subtitle)
-                        .setTitle(title)
+                        .setTitle(title);
 
                     // This should not be set if a backup is allowed (PIN/Pattern/Password)
                     if(!allowDeviceCredential) {
