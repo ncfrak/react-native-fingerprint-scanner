@@ -149,7 +149,7 @@ public class ReactNativeFingerprintScannerModule
 
                     // This should not be set if a backup is allowed (PIN/Pattern/Password)
                     if(!allowDeviceCredential) {
-                        builder = builder.setNegativeButtonText(cancelButton);
+                        promptInfo.setNegativeButtonText(cancelButton);
                     }
 
                     bioPrompt.authenticate(promptInfo);
