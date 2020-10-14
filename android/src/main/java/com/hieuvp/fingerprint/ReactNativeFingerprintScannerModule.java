@@ -139,20 +139,19 @@ public class ReactNativeFingerprintScannerModule
                     boolean allowDeviceCredential = mDeviceCredentialAllowed &&
                                 isDeviceSecure();
 
-                    PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                        .setDeviceCredentialAllowed(false)
+                    PromptInfo.Builder promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setDeviceCredentialAllowed(allowDeviceCredential)
                         .setConfirmationRequired(false)
                         .setDescription(description)
                         .setSubtitle(subtitle)
                         .setTitle(title)
-                        .build();
 
                     // This should not be set if a backup is allowed (PIN/Pattern/Password)
                     if(!allowDeviceCredential) {
-                        promptInfo.setNegativeButtonText(cancelButton);
+                        promptInfo = promptInfo.setNegativeButtonText(cancelButton);
                     }
 
-                    bioPrompt.authenticate(promptInfo);
+                    bioPrompt.authenticate(promptInfo.build());
                 }
             });
 
