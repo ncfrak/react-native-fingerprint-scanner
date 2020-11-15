@@ -43,7 +43,6 @@ public class ReactNativeFingerprintScannerModule
     private final ReactApplicationContext mReactContext;
     private BiometricPrompt biometricPrompt;
     private KeyguardManager mKeyguardManager;
-    private boolean mDeviceCredentialAllowed = false;
 
     // for Samsung/MeiZu compat, Android v16-23
     private FingerprintIdentify mFingerprintIdentify;
@@ -126,7 +125,8 @@ public class ReactNativeFingerprintScannerModule
         return biometricPrompt;
     }
 
-    private void biometricAuthenticate(final String title, final String subtitle, final String description, final String cancelButton, final Promise promise) {
+    private void biometricAuthenticate(final String title, final String subtitle, final String description,
+            final String cancelButton, final boolean deviceCredentialAllowed, final Promise promise) {
         UiThreadUtil.runOnUiThread(
             new Runnable() {
                 @Override
@@ -136,19 +136,18 @@ public class ReactNativeFingerprintScannerModule
                     if(fragmentActivity == null) return;
 
                     BiometricPrompt bioPrompt = getBiometricPrompt(fragmentActivity, promise);
-                    boolean allowDeviceCredential = mDeviceCredentialAllowed &&
-                                isDeviceSecure();
 
                     PromptInfo.Builder promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                        .setDeviceCredentialAllowed(allowDeviceCredential)
                         .setConfirmationRequired(false)
                         .setDescription(description)
                         .setSubtitle(subtitle)
                         .setTitle(title);
-
-                    // This should not be set if a backup is allowed (PIN/Pattern/Password)
-                    if(!allowDeviceCredential) {
-                        promptInfo = promptInfo.setNegativeButtonText(cancelButton);
+                    
+                    if (deviceCredentialAllowed && isDeviceSecure()) {
+                        promptInfo.setDeviceCredentialAllowed(true);
+                    }
+                    else {
+                        promptInfo.setNegativeButtonText(cancelButton);
                     }
 
                     bioPrompt.authenticate(promptInfo.build());
@@ -210,19 +209,13 @@ public class ReactNativeFingerprintScannerModule
     }
 
     @ReactMethod
-    public void authenticate(String title, String subtitle, String description, String cancelButton, final Promise promise) {
+    public void authenticate(String title, String subtitle, String description, String cancelButton,
+            boolean deviceCredentialAllowed, final Promise promise) {
         if (requiresLegacyAuthentication()) {
             legacyAuthenticate(promise);
         }
         else {
-            final String errorName = getSensorError();
-            if (errorName != null) {
-                promise.reject(errorName, TYPE_BIOMETRICS);
-                ReactNativeFingerprintScannerModule.this.release();
-                return;
-            }
-
-            biometricAuthenticate(title, subtitle, description, cancelButton, promise);
+            biometricAuthenticate(title, subtitle, description, cancelButton, deviceCredentialAllowed, promise);
         }
     }
 
@@ -260,11 +253,6 @@ public class ReactNativeFingerprintScannerModule
         } else {
             promise.resolve(TYPE_BIOMETRICS);
         }
-    }
-
-    @ReactMethod
-    public void setDeviceCredentialAllowed(boolean allowed) {
-        mDeviceCredentialAllowed = allowed;
     }
 
     // for Samsung/MeiZu compat, Android v16-23
